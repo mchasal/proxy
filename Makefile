@@ -13,6 +13,7 @@
 ## limitations under the License.
 
 TOP := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+ARCH=$(shell uname -m)
 
 SHELL := /bin/bash
 LOCAL_ARTIFACTS_DIR ?= $(abspath artifacts)
@@ -25,13 +26,23 @@ BAZEL_TARGETS ?= //...
 SANITIZER_EXCLUSIONS ?= -test/integration:mixer_fault_test
 HUB ?=
 TAG ?=
-ifeq "$(origin CC)" "default"
-CC := clang-7
+ifeq "$(ARCH)" "ppc64le"
+    ifeq "$(origin CC)" "default"
+    CC := clang
+    endif
+    ifeq "$(origin CXX)" "default"
+    CXX := clang++
+    endif
+    PATH := /usr/lib/llvm/bin:$(PATH)
+else
+    ifeq "$(origin CC)" "default"
+    CC := clang-7
+    endif
+    ifeq "$(origin CXX)" "default"
+    CXX := clang++-7
+    endif
+    PATH := /usr/lib/llvm-7/bin:$(PATH)
 endif
-ifeq "$(origin CXX)" "default"
-CXX := clang++-7
-endif
-PATH := /usr/lib/llvm-7/bin:$(PATH)
 
 # Removed 'bazel shutdown' as it could cause CircleCI to hang
 build:
@@ -39,7 +50,11 @@ build:
 
 # Build only envoy - fast
 build_envoy:
-	PATH=$(PATH) CC=$(CC) CXX=$(CXX) bazel $(BAZEL_STARTUP_ARGS) build $(BAZEL_BUILD_ARGS) //src/envoy:envoy
+    ifeq "$(ARCH)" "ppc64le"
+	    bazel $(BAZEL_STARTUP_ARGS) build $(BAZEL_BUILD_ARGS) //src/envoy:envoy
+    else
+	    PATH=$(PATH) CC=$(CC) CXX=$(CXX) bazel $(BAZEL_STARTUP_ARGS) build $(BAZEL_BUILD_ARGS) //src/envoy:envoy
+    endif
 
 clean:
 	@bazel clean
